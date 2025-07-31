@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Layout } from 'antd';
 import AppHeader from './components/Layout/AppHeader';
@@ -19,11 +19,17 @@ const { Content } = Layout;
  * 包含整体布局和路由配置
  */
 const App: React.FC = () => {
+  const [collapsed, setCollapsed] = useState(false);
+  
+  const handleSiderCollapse = (isCollapsed: boolean) => {
+    setCollapsed(isCollapsed);
+  };
+
   return (
     <Router>
       <Layout style={{ minHeight: '100vh' }}>
-        <AppSider />
-        <Layout>
+        <AppSider onCollapse={handleSiderCollapse} />
+        <Layout style={{ marginLeft: collapsed ? 80 : 200, transition: 'margin-left 0.2s' }}>
           <AppHeader />
           <Content style={{ margin: '24px 16px', padding: 24, background: '#fff' }}>
             <Routes>

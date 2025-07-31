@@ -14,11 +14,15 @@ import {
 
 const { Sider } = Layout;
 
+interface AppSiderProps {
+  onCollapse?: (collapsed: boolean) => void;
+}
+
 /**
  * 侧边栏导航组件
  * 提供主要功能模块的导航菜单
  */
-const AppSider: React.FC = () => {
+const AppSider: React.FC<AppSiderProps> = ({ onCollapse }) => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -86,7 +90,12 @@ const AppSider: React.FC = () => {
     <Sider 
       collapsible 
       collapsed={collapsed} 
-      onCollapse={setCollapsed}
+      onCollapse={(value) => {
+        setCollapsed(value);
+        if (onCollapse) {
+          onCollapse(value);
+        }
+      }}
       style={{
         overflow: 'auto',
         height: '100vh',
@@ -94,7 +103,9 @@ const AppSider: React.FC = () => {
         left: 0,
         top: 0,
         bottom: 0,
+        zIndex: 1,
       }}
+      width={200}
     >
       <div className="logo">
         {collapsed ? 'LM' : 'LinkMatrix'}
