@@ -6,9 +6,10 @@ class ExamplePlatformAutomation(BrowserAutomationBase):
     def __init__(self, platform: str, storage_state_path: str, proxy: dict = None, 
                  user_agent: str = None, viewport_size: dict = None):
         super().__init__(platform, storage_state_path, proxy, user_agent, viewport_size)
-        self.base_url = "https://www.example.com"
-        self.login_url = "https://www.example.com/login"
-        self.profile_url = "https://www.example.com/user"
+        self.base_url = "https://www.bilibili.com/"
+        self.login_url = "https://www.bilibili.com/"
+        self.profile_url = "https://space.bilibili.com"
+        self.upload_video_url = "https://member.bilibili.com/platform/upload/video/frame"
 
     @log_function_call(logger)
     def get_login_url(self) -> str:
@@ -20,6 +21,10 @@ class ExamplePlatformAutomation(BrowserAutomationBase):
 
     @log_function_call(logger)
     async def wait_for_login_completion(self) -> None:
+        """
+        等待用户在有头浏览器中手动完成登录
+        用户关闭浏览器后即认为登录完成
+        """
         logger.info("等待用户在浏览器中完成登录...")
         logger.info("请在浏览器中完成登录操作，完成后直接关闭浏览器窗口")
         
@@ -63,7 +68,7 @@ class ExamplePlatformAutomation(BrowserAutomationBase):
             
             logger.debug("检查用户信息元素")
             try:
-                element = await self.page.wait_for_selector('.user-info', timeout=5000)
+                element = await self.page.wait_for_selector('.nickname', timeout=5000)
                 if element:
                     is_logged_in = True
                     user_info["username"] = await element.text_content()
@@ -89,39 +94,6 @@ class ExamplePlatformAutomation(BrowserAutomationBase):
                 "error": str(e)
             }
 
-    @log_function_call(logger)
-    async def auto_login(self, username: str, password: str) -> bool:
-        """
-        自动化登录（如平台支持自动填充账号密码，不需要验证码可以使用此接口）
-        """
-        logger.info(f"开始自动登录，用户名: {username}")
-        
-        try:
-            logger.debug(f"导航到登录页面: {self.login_url}")
-            await self.page.goto(self.login_url)
-            
-            # 示例：自动填充账号密码并点击登录
-            logger.debug("填写用户名")
-            await self.page.fill('input[name="username"]', username)
-            
-            logger.debug("填写密码")
-            await self.page.fill('input[name="password"]', password)
-            
-            logger.debug("点击登录按钮")
-            await self.page.click('button[type="submit"]')
-            
-            logger.debug("等待登录完成")
-            await self.wait_for_login_completion()
-            
-            logger.debug("保存登录状态")
-            await self.save_login_state()
-            
-            logger.info("自动登录成功")
-            return True
-            
-        except Exception as e:
-            log_exception(logger, e, "自动登录失败")
-            return False
 
     @log_function_call(logger)
     async def publish_video(self, video_path: str, title: str, description: str) -> bool:
@@ -133,9 +105,8 @@ class ExamplePlatformAutomation(BrowserAutomationBase):
         
         try:
             # 1. 跳转到视频发布页面
-            upload_url = f"{self.base_url}/video/upload"
-            logger.debug(f"导航到视频发布页面: {upload_url}")
-            await self.page.goto(upload_url, wait_until="networkidle")
+            logger.debug(f"导航到视频发布页面: {self.upload_video_url}")
+            await self.page.goto(self.upload_video_url, wait_until="networkidle")
             
             # 2. 上传视频文件
             logger.debug("查找文件上传控件")
