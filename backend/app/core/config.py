@@ -1,5 +1,4 @@
 from typing import List
-from pydantic import BaseSettings, validator
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -11,15 +10,9 @@ class Settings:
     PROJECT_NAME: str = "LinkMatrix Backend"
     API_PREFIX: str = "/api/v1"
     
-    # 数据库配置 - 支持Supabase PostgreSQL
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", 
-        "sqlite:///./sql_app.db"  # 默认SQLite，生产环境使用Supabase
-    )
-    
     # Supabase配置
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:3001"]  # 前端端口
@@ -36,7 +29,17 @@ class Settings:
     @property
     def is_using_supabase(self) -> bool:
         """检查是否使用Supabase"""
-        return self.DATABASE_URL.startswith("postgresql://")
+        return bool(self.SUPABASE_URL and self.SUPABASE_SERVICE_ROLE_KEY)
+    
+    @property
+    def supabase_connection_info(self) -> dict:
+        """获取Supabase连接信息（用于调试）"""
+        if self.is_using_supabase:
+            return {
+                "url": self.SUPABASE_URL,
+                "has_key": bool(self.SUPABASE_SERVICE_ROLE_KEY)
+            }
+        return {}
     
     # 确保必要目录存在
     def __init__(self):

@@ -148,3 +148,21 @@ class SystemSetting(Base):
     value = Column(String)
     value_type = Column(String)  # string, int, bool, json
     description = Column(String, nullable=True)
+
+
+class ApiAccountWx(Base):
+    """微信公众号API账户模型"""
+    __tablename__ = "api_accounts_wx"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)  # 账户名称
+    appid = Column(String, unique=True, index=True)  # 微信公众号AppID
+    app_secret = Column(String)  # 微信公众号AppSecret
+    wx_id = Column(String, index=True)  # 微信公众号ID
+    title = Column(String)  # 默认标题
+    author = Column(String)  # 作者名称
+    thumb_media_id = Column(String, nullable=True)  # 默认封面媒体ID
+    illust_tag = Column(JSON, nullable=True)  # 插图标签，JSON格式
+    status = Column(String, default="active")  # 账户状态
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

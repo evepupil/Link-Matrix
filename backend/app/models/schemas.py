@@ -192,3 +192,33 @@ class SystemSettings(BaseModel):
 
     class Config:
         orm_mode = True
+
+# 微信公众号API账户模型
+class ApiAccountWxBase(BaseModel):
+    name: str
+    appid: str
+    app_secret: str
+    wx_id: str
+    title: str
+    author: str
+    thumb_media_id: Optional[str] = None
+    illust_tag: Optional[List[List[str]]] = None
+
+class ApiAccountWxCreate(ApiAccountWxBase):
+    pass
+
+class ApiAccountWxUpdate(BaseModel):
+    name: Optional[str] = None
+    app_secret: Optional[str] = None
+    wx_id: Optional[str] = None
+    title: Optional[str] = None
+    author: Optional[str] = None
+    thumb_media_id: Optional[str] = None
+    illust_tag: Optional[List[List[str]]] = None
+    status: Optional[str] = None
+
+class ApiAccountWx(BaseResponse, ApiAccountWxBase):
+    status: str
+
+class ApiAccountWxResponse(BaseResponse, ApiAccountWxBase):
+    status: str

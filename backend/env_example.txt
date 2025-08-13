@@ -1,0 +1,18 @@
+# Supabase配置
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+
+# 数据库配置 - 使用Supabase PostgreSQL
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-ID].supabase.co:5432/postgres
+
+# 日志配置
+LOG_LEVEL=INFO
+LOG_DIR=./logs
+LOG_MAX_SIZE=10485760
+LOG_BACKUP_COUNT=5
+
+# 浏览器配置
+BROWSER_PROFILES_DIR=./browser_profiles
+
+# CORS配置
+CORS_ORIGINS=["http://localhost:3000", "http://localhost:3001"] 

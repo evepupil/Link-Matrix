@@ -13,20 +13,20 @@ class SupabaseClient:
     @classmethod
     def get_client(cls) -> Optional[Client]:
         """获取Supabase客户端实例"""
-        if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
+        if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
             return None
             
         if cls._instance is None:
             cls._instance = create_client(
                 settings.SUPABASE_URL,
-                settings.SUPABASE_KEY
+                settings.SUPABASE_SERVICE_ROLE_KEY
             )
         return cls._instance
     
     @classmethod
     def is_available(cls) -> bool:
         """检查Supabase是否可用"""
-        return bool(settings.SUPABASE_URL and settings.SUPABASE_KEY)
+        return bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
 
 # 便捷函数
 def get_supabase_client() -> Optional[Client]:

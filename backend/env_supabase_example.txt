@@ -1,0 +1,26 @@
+# Supabase配置示例
+# 请将此文件重命名为 .env 并填入您的实际配置
+
+# 从Supabase项目设置中获取以下信息：
+# 1. Project URL: Settings → General → Project URL
+# 2. API Keys: Settings → API → Project API keys → service_role
+# 3. Database: Settings → Database → Connection string → URI
+
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# 数据库配置 - 使用Supabase PostgreSQL
+# 格式: postgresql://postgres.[project-id]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.[project-id]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+
+# 日志配置
+LOG_LEVEL=INFO
+LOG_DIR=./logs
+LOG_MAX_SIZE=10485760
+LOG_BACKUP_COUNT=5
+
+# 浏览器配置
+BROWSER_PROFILES_DIR=./browser_profiles
+
+# CORS配置
+CORS_ORIGINS=["http://localhost:3000", "http://localhost:3001"] 

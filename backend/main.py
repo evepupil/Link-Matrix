@@ -17,6 +17,24 @@ app = FastAPI(
 
 logger.info("正在启动 LinkMatrix 后端服务...")
 
+# 检查Supabase配置
+if settings.is_using_supabase:
+    logger.info("检测到Supabase配置，连接信息:")
+    for key, value in settings.supabase_connection_info.items():
+        logger.info(f"  {key}: {value}")
+    
+    # 测试Supabase连接
+    try:
+        from app.database.supabase_init import test_supabase_connection
+        if test_supabase_connection():
+            logger.info("✅ Supabase连接成功")
+        else:
+            logger.warning("⚠️ Supabase连接失败，请检查配置")
+    except Exception as e:
+        logger.error(f"❌ Supabase连接测试异常: {e}")
+else:
+    logger.info("未配置Supabase，使用本地数据库")
+
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,

@@ -1,35 +1,24 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
+"""
+数据库会话管理
+使用Supabase客户端进行数据库操作
+"""
 from app.core.config import settings
+from app.core.logger import get_logger
+from app.database.supabase_client import get_supabase_client
 
-# 根据数据库类型设置连接参数
-if settings.is_using_supabase:
-    # PostgreSQL/Supabase 连接配置
-    engine = create_engine(
-        settings.DATABASE_URL,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        echo=False  # 生产环境设为False
-    )
-else:
-    # SQLite 连接配置
-    engine = create_engine(
-        settings.DATABASE_URL, 
-        connect_args={"check_same_thread": False}
-    )
+logger = get_logger(__name__)
 
-# 创建会话本地类
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 创建基本模型类
-Base = declarative_base()
-
-# 获取数据库会话的依赖项
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    """获取Supabase数据库客户端"""
+    if not settings.is_using_supabase:
+        raise RuntimeError("必须配置Supabase数据库")
+    
+    client = get_supabase_client()
+    if not client:
+        raise RuntimeError("无法获取Supabase客户端")
+    
+    return client
+
+def get_supabase_db():
+    """获取Supabase数据库会话"""
+    return get_db()
