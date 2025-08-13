@@ -110,6 +110,74 @@ export interface HealthCheckResponse {
   };
 }
 
+// 自动化相关类型定义
+
+// 代理配置
+export interface ProxyConfig {
+  server: string;
+  username?: string;
+  password?: string;
+}
+
+// 视窗大小
+export interface ViewportSize {
+  width: number;
+  height: number;
+}
+
+// 自动化配置
+export interface AutomationConfig {
+  platform: string;
+  storage_state_path: string;
+  proxy?: ProxyConfig;
+  user_agent?: string;
+  viewport_size?: ViewportSize;
+}
+
+// 登录状态检查结果
+export interface LoginStatusResult {
+  is_logged_in: boolean;
+  user_info: Record<string, any>;
+  current_url?: string;
+  error?: string;
+}
+
+// 发布视频请求
+export interface PublishVideoRequest {
+  video_path: string;
+  title: string;
+  description: string;
+  tags?: string[];
+  category?: string;
+}
+
+// 发布视频结果
+export interface PublishVideoResult {
+  success: boolean;
+  video_id?: string;
+  url?: string;
+  error?: string;
+}
+
+// 自动化任务状态
+export interface AutomationTaskStatus {
+  task_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress?: number;
+  result?: any;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 自动化任务请求
+export interface CreateAutomationTaskRequest {
+  platform: string;
+  action: 'login' | 'check_status' | 'publish_video' | 'save_state';
+  config: AutomationConfig;
+  data?: any;
+}
+
 // 系统信息响应
 export interface SystemInfoResponse {
   nodeVersion: string;

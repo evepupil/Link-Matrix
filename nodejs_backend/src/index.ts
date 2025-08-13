@@ -9,6 +9,7 @@ import fs from 'fs';
 import config, { validateConfig, isUsingSupabase, getSupabaseConnectionInfo } from '@/config';
 import { testSupabaseConnection, initSupabaseTables } from '@/services/supabase';
 import accountsRouter from '@/routes/accounts';
+import weixinRouter from '@/routes/weixin';
 
 // 创建 Express 应用
 const app = express();
@@ -96,6 +97,7 @@ const setupRoutes = () => {
   
   // API 路由
   app.use(`${config.apiPrefix}/accounts`, accountsRouter);
+  app.use(`${config.apiPrefix}/weixin`, weixinRouter);
   
   // 404 处理
   app.use('*', (req, res) => {

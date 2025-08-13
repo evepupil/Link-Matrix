@@ -13,15 +13,18 @@ import {
   message,
   Space,
   Image,
-  Typography
+  Typography,
+  Tabs
 } from 'antd';
 import { 
   UploadOutlined, 
   SendOutlined, 
   FileTextOutlined, 
-  VideoCameraOutlined 
+  VideoCameraOutlined,
+  WechatOutlined
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import WeixinPublish from './OneClickPublish/WeixinPublish/index';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -45,9 +48,10 @@ interface PublishContent {
 
 /**
  * 一键发布页面组件
- * 支持视频和文章的多平台发布
+ * 支持视频、文章和微信公众号的多平台发布
  */
 const OneClickPublish: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('general');
   const [contentType, setContentType] = useState<'video' | 'article'>('video');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
@@ -101,281 +105,256 @@ const OneClickPublish: React.FC = () => {
   };
 
   /**
+   * 处理账户选择
+   */
+  const handleAccountSelection = (checkedValues: string[]) => {
+    setSelectedAccounts(checkedValues);
+  };
+
+  /**
    * 获取平台名称
    */
   const getPlatformName = (platform: string) => {
-    const nameMap: Record<string, string> = {
-      weibo: '微博',
-      wechat: '微信',
-      youtube: 'YouTube',
-      twitter: 'Twitter',
+    const platformNames: Record<string, string> = {
+      'weibo': '微博',
+      'wechat': '微信',
+      'youtube': 'YouTube',
+      'twitter': 'Twitter',
     };
-    return nameMap[platform] || platform;
+    return platformNames[platform] || platform;
   };
 
   /**
-   * 处理账户选择
+   * 处理发布
    */
-  const handleAccountSelection = (accountIds: string[]) => {
-    setSelectedAccounts(accountIds);
-  };
-
-  /**
-   * 提交发布任务
-   */
-  const handlePublish = async () => {
-    try {
-      const values = await form.validateFields();
-      
-      if (selectedAccounts.length === 0) {
-        message.error('请至少选择一个发布账户');
-        return;
-      }
-
-      if (contentType === 'video' && !publishContent.videoFile) {
-        message.error('请上传视频文件');
-        return;
-      }
-
-      // TODO: 调用后端API提交发布任务
-      message.success('发布任务已提交到任务队列');
-      
-      // 重置表单
-      form.resetFields();
-      setSelectedAccounts([]);
-      setPublishContent({
-        type: contentType,
-        title: '',
-        description: '',
-        tags: [],
-      });
-      
-    } catch (error) {
-      console.error('表单验证失败:', error);
+  const handlePublish = () => {
+    if (selectedAccounts.length === 0) {
+      message.warning('请选择至少一个发布平台');
+      return;
     }
+
+    if (!publishContent.title || !publishContent.description) {
+      message.warning('请填写标题和描述');
+      return;
+    }
+
+    message.success('发布任务已提交');
+    console.log('发布内容:', publishContent);
+    console.log('选择的账户:', selectedAccounts);
   };
 
-  return (
-    <div>
-      <h1>一键发布</h1>
-      
-      <Row gutter={24}>
-        <Col span={16}>
-          <Card title="发布内容" style={{ marginBottom: 16 }}>
-            <Form form={form} layout="vertical">
-              <Form.Item label="内容类型">
-                <Radio.Group 
-                  value={contentType} 
-                  onChange={(e) => {
-                    setContentType(e.target.value);
-                    setPublishContent(prev => ({ ...prev, type: e.target.value }));
-                  }}
-                >
-                  <Radio.Button value="video">
-                    <VideoCameraOutlined /> 发布视频
-                  </Radio.Button>
-                  <Radio.Button value="article">
-                    <FileTextOutlined /> 发布文章
-                  </Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-
-              {contentType === 'video' ? (
-                <Form.Item label="视频文件">
-                  <Upload {...uploadProps} accept=".mp4,.avi,.mov,.mkv">
-                    <Button icon={<UploadOutlined />}>选择视频文件</Button>
-                  </Upload>
-                  {publishContent.videoFile && (
-                    <div style={{ marginTop: 8 }}>
-                      <Text type="secondary">已选择：{publishContent.videoFile}</Text>
-                    </div>
-                  )}
-                </Form.Item>
-              ) : (
-                <Form.Item 
-                  name="content" 
-                  label="文章内容"
-                  rules={[{ required: true, message: '请输入文章内容' }]}
-                >
-                  <TextArea 
-                    rows={8} 
-                    placeholder="请输入文章内容..."
-                    onChange={(e) => 
-                      setPublishContent(prev => ({ ...prev, content: e.target.value }))
-                    }
-                  />
-                </Form.Item>
-              )}
-
-              <Form.Item 
-                name="title" 
-                label="标题"
-                rules={[{ required: true, message: '请输入标题' }]}
+  // 通用发布内容
+  const GeneralPublish = () => (
+    <Row gutter={24}>
+      <Col span={16}>
+        <Card title="内容配置" style={{ marginBottom: 16 }}>
+          <Form form={form} layout="vertical">
+            <Form.Item label="内容类型">
+              <Radio.Group 
+                value={contentType} 
+                onChange={(e) => setContentType(e.target.value)}
               >
-                <Input 
-                  placeholder="请输入标题"
-                  onChange={(e) => 
-                    setPublishContent(prev => ({ ...prev, title: e.target.value }))
-                  }
-                />
-              </Form.Item>
+                <Radio.Button value="video">
+                  <VideoCameraOutlined /> 视频
+                </Radio.Button>
+                <Radio.Button value="article">
+                  <FileTextOutlined /> 文章
+                </Radio.Button>
+              </Radio.Group>
+            </Form.Item>
 
-              <Form.Item 
-                name="description" 
-                label="描述"
-                rules={[{ required: true, message: '请输入描述' }]}
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: '请输入标题' }]}
+            >
+              <Input 
+                placeholder="请输入内容标题" 
+                value={publishContent.title}
+                onChange={(e) => setPublishContent(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="description"
+              label="描述"
+              rules={[{ required: true, message: '请输入描述' }]}
+            >
+              <TextArea 
+                rows={4}
+                placeholder="请输入内容描述"
+                value={publishContent.description}
+                onChange={(e) => setPublishContent(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="tags"
+              label="标签"
+            >
+              <Select
+                mode="tags"
+                placeholder="请输入标签，按回车确认"
+                value={publishContent.tags}
+                onChange={(value) => setPublishContent(prev => ({ ...prev, tags: value }))}
+              />
+            </Form.Item>
+
+            {contentType === 'video' ? (
+              <Form.Item
+                name="videoFile"
+                label="视频文件"
+                rules={[{ required: true, message: '请上传视频文件' }]}
+              >
+                <Upload {...uploadProps}>
+                  <Button icon={<UploadOutlined />}>选择视频文件</Button>
+                </Upload>
+              </Form.Item>
+            ) : (
+              <Form.Item
+                name="content"
+                label="文章内容"
+                rules={[{ required: true, message: '请输入文章内容' }]}
               >
                 <TextArea 
-                  rows={4} 
-                  placeholder="请输入描述..."
-                  onChange={(e) => 
-                    setPublishContent(prev => ({ ...prev, description: e.target.value }))
-                  }
+                  rows={8}
+                  placeholder="请输入文章内容"
+                  value={publishContent.content}
+                  onChange={(e) => setPublishContent(prev => ({ ...prev, content: e.target.value }))}
                 />
               </Form.Item>
-
-              <Form.Item name="tags" label="标签">
-                <Select
-                  mode="tags"
-                  placeholder="请输入标签，按回车添加"
-                  onChange={(tags) => 
-                    setPublishContent(prev => ({ ...prev, tags }))
-                  }
-                />
-              </Form.Item>
-
-              <Form.Item label="封面图片">
-                <Upload {...uploadProps} accept=".jpg,.jpeg,.png,.gif">
-                  <Button icon={<UploadOutlined />}>上传封面</Button>
-                </Upload>
-                {publishContent.cover && (
-                  <div style={{ marginTop: 8 }}>
-                    <Text type="secondary">已选择：{publishContent.cover}</Text>
-                  </div>
-                )}
-              </Form.Item>
-            </Form>
-          </Card>
-
-          <Card title="平台适配设置">
-            <Form layout="vertical">
-              <Form.Item label="微博设置">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Checkbox>同时发布到微博故事</Checkbox>
-                  <Checkbox>添加话题标签</Checkbox>
-                  <Input placeholder="自定义话题标签" />
-                </Space>
-              </Form.Item>
-
-              <Form.Item label="微信设置">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Checkbox>发布到朋友圈</Checkbox>
-                  <Checkbox>同步到微信群</Checkbox>
-                </Space>
-              </Form.Item>
-
-              <Form.Item label="YouTube设置">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Select placeholder="选择分类" style={{ width: '100%' }}>
-                    <Select.Option value="education">教育</Select.Option>
-                    <Select.Option value="entertainment">娱乐</Select.Option>
-                    <Select.Option value="technology">科技</Select.Option>
-                  </Select>
-                  <Checkbox>添加到播放列表</Checkbox>
-                </Space>
-              </Form.Item>
-            </Form>
-          </Card>
-        </Col>
-
-        <Col span={8}>
-          <Card title="选择发布账户" style={{ marginBottom: 16 }}>
-            <Checkbox.Group 
-              value={selectedAccounts}
-              onChange={handleAccountSelection}
-              style={{ width: '100%' }}
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {accounts.map(account => (
-                  <Checkbox 
-                    key={account.id} 
-                    value={account.id}
-                    disabled={account.status === 'offline'}
-                  >
-                    <Space>
-                      <span>{getPlatformName(account.platform)}</span>
-                      <span style={{ color: '#666' }}>({account.accountName})</span>
-                      {account.status === 'offline' && (
-                        <Text type="secondary" style={{ fontSize: '12px' }}>离线</Text>
-                      )}
-                    </Space>
-                  </Checkbox>
-                ))}
-              </Space>
-            </Checkbox.Group>
-          </Card>
-
-          <Card title="发布预览">
-            <div style={{ marginBottom: 16 }}>
-              <Text strong>标题：</Text>
-              <div>{publishContent.title || '请输入标题'}</div>
-            </div>
-            
-            <div style={{ marginBottom: 16 }}>
-              <Text strong>描述：</Text>
-              <div style={{ 
-                maxHeight: '100px', 
-                overflow: 'auto',
-                color: publishContent.description ? 'inherit' : '#999'
-              }}>
-                {publishContent.description || '请输入描述'}
-              </div>
-            </div>
-
-            {publishContent.tags.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <Text strong>标签：</Text>
-                <div>
-                  {publishContent.tags.map(tag => (
-                    <span key={tag} style={{ 
-                      background: '#f0f0f0', 
-                      padding: '2px 8px', 
-                      margin: '2px',
-                      borderRadius: '4px',
-                      fontSize: '12px'
-                    }}>
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
             )}
+          </Form>
+        </Card>
+      </Col>
 
+      <Col span={8}>
+        <Card title="选择发布账户" style={{ marginBottom: 16 }}>
+          <Checkbox.Group 
+            value={selectedAccounts}
+            onChange={handleAccountSelection}
+            style={{ width: '100%' }}
+          >
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {accounts.map(account => (
+                <Checkbox 
+                  key={account.id} 
+                  value={account.id}
+                  disabled={account.status === 'offline'}
+                >
+                  <Space>
+                    <span>{getPlatformName(account.platform)}</span>
+                    <span style={{ color: '#666' }}>({account.accountName})</span>
+                    {account.status === 'offline' && (
+                      <Text type="secondary" style={{ fontSize: '12px' }}>离线</Text>
+                    )}
+                  </Space>
+                </Checkbox>
+              ))}
+            </Space>
+          </Checkbox.Group>
+        </Card>
+
+        <Card title="发布预览">
+          <div style={{ marginBottom: 16 }}>
+            <Text strong>标题：</Text>
+            <div>{publishContent.title || '请输入标题'}</div>
+          </div>
+          
+          <div style={{ marginBottom: 16 }}>
+            <Text strong>描述：</Text>
+            <div style={{ 
+              maxHeight: '100px', 
+              overflow: 'auto',
+              color: publishContent.description ? 'inherit' : '#999'
+            }}>
+              {publishContent.description || '请输入描述'}
+            </div>
+          </div>
+
+          {publishContent.tags.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <Text strong>发布平台：</Text>
+              <Text strong>标签：</Text>
               <div>
-                {selectedAccounts.length > 0 
-                  ? selectedAccounts.map(id => {
-                      const account = accounts.find(acc => acc.id === id);
-                      return account ? getPlatformName(account.platform) : '';
-                    }).join('、')
-                  : '请选择发布平台'
-                }
+                {publishContent.tags.map(tag => (
+                  <span key={tag} style={{ 
+                    background: '#f0f0f0', 
+                    padding: '2px 8px', 
+                    margin: '2px',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    #{tag}
+                  </span>
+                ))}
               </div>
             </div>
+          )}
 
-            <Button 
-              type="primary" 
-              icon={<SendOutlined />} 
-              onClick={handlePublish}
-              block
-              size="large"
-            >
-              提交发布任务
-            </Button>
-          </Card>
-        </Col>
-      </Row>
+          <div style={{ marginBottom: 16 }}>
+            <Text strong>发布平台：</Text>
+            <div>
+              {selectedAccounts.length > 0 
+                ? selectedAccounts.map(id => {
+                    const account = accounts.find(acc => acc.id === id);
+                    return account ? getPlatformName(account.platform) : '';
+                  }).join('、')
+                : '请选择发布平台'
+              }
+            </div>
+          </div>
+
+          <Button 
+            type="primary" 
+            icon={<SendOutlined />} 
+            onClick={handlePublish}
+            block
+            size="large"
+          >
+            提交发布任务
+          </Button>
+        </Card>
+      </Col>
+    </Row>
+  );
+
+  return (
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>
+          一键发布
+        </h1>
+        <p style={{ margin: '8px 0 0 0', color: '#666' }}>
+          支持视频、文章和微信公众号的多平台发布，提高内容分发效率
+        </p>
+      </div>
+
+      <Tabs 
+        activeKey={activeTab} 
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'general',
+            label: (
+              <span>
+                <SendOutlined />
+                通用发布
+              </span>
+            ),
+            children: <GeneralPublish />,
+          },
+          {
+            key: 'weixin',
+            label: (
+              <span>
+                <WechatOutlined />
+                微信公众号
+              </span>
+            ),
+            children: <WeixinPublish />,
+          },
+        ]}
+      />
     </div>
   );
 };

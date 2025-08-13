@@ -14,11 +14,11 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
 
   try {
     const response = await fetch(url, config);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('API request failed:', error);
@@ -30,24 +30,24 @@ const request = async (endpoint: string, options: RequestInit = {}) => {
 export const browserAccountAPI = {
   // 获取所有浏览器账户
   getAll: () => request('/accounts/browser/'),
-  
+
   // 创建浏览器账户
   create: (data: any) => request('/accounts/browser/', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  
+
   // 更新浏览器账户
   update: (id: number, data: any) => request(`/accounts/browser/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
-  
+
   // 删除浏览器账户
   delete: (id: number) => request(`/accounts/browser/${id}`, {
     method: 'DELETE',
   }),
-  
+
   // 获取单个浏览器账户
   getById: (id: number) => request(`/accounts/browser/${id}`),
 };
@@ -56,33 +56,68 @@ export const browserAccountAPI = {
 export const apiAccountAPI = {
   // 获取所有API账户
   getAll: () => request('/accounts/api/wx/'),
-  
+
   // 创建API账户
   create: (data: any) => request('/accounts/api/wx/', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  
+
   // 更新API账户
   update: (id: number, data: any) => request(`/accounts/api/wx/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
-  
+
   // 删除API账户
   delete: (id: number) => request(`/accounts/api/wx/${id}`, {
     method: 'DELETE',
   }),
-  
+
   // 获取单个API账户
   getById: (id: number) => request(`/accounts/api/wx/${id}`),
+};
+
+// 微信公众号发布API
+export const weixinPublishAPI = {
+  // 查询符合条件的图片
+  queryPics: (params: {
+    wx_name: string;
+    tags: string[];
+    unsupport_tags: string[];
+  }) => request('/weixin/query-pics', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  }),
+
+  // 下载图片
+  downloadPics: (pids: number[]) => request('/weixin/download-pics', {
+    method: 'POST',
+    body: JSON.stringify({ pids }),
+  }),
+
+  // 上传到微信公众号
+  publishToWeixin: (data: {
+    account_id: number;
+    pids: number[];
+    unfit_pids: number[];
+  }) => request('/weixin/publish', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 获取下载进度
+  getDownloadProgress: (task_id: string) => request(`/weixin/download-progress/${task_id}`),
+
+  // 获取发布进度
+  getPublishProgress: (task_id: string) => request(`/weixin/publish-progress/${task_id}`),
 };
 
 // 通用API
 export const commonAPI = {
   // 健康检查
   health: () => request('/health'),
-  
+
   // 获取系统信息
   systemInfo: () => request('/system/info'),
 };
@@ -90,5 +125,6 @@ export const commonAPI = {
 export default {
   browserAccount: browserAccountAPI,
   apiAccount: apiAccountAPI,
+  weixinPublish: weixinPublishAPI,
   common: commonAPI,
 }; 
