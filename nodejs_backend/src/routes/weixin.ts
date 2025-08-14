@@ -103,4 +103,26 @@ router.get('/publish-progress/:taskId', async (req: Request, res: Response): Pro
   }
 });
 
+/**
+ * 查询图片下载状态
+ * POST /api/v1/weixin/check-download-status
+ */
+router.post('/check-download-status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { pids } = req.body;
+
+    if (!pids || !Array.isArray(pids)) {
+      res.status(400).json(createApiResponse(false, undefined, undefined, '参数错误'));
+      return;
+    }
+
+    const status = await WeixinService.checkDownloadStatus(pids);
+    res.status(200).json(createApiResponse(true, status));
+  } catch (error) {
+    console.error('查询下载状态失败:', error);
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    res.status(500).json(createApiResponse(false, undefined, undefined, `查询下载状态失败: ${errorMessage}`));
+  }
+});
+
 export default router; 

@@ -62,7 +62,7 @@ const config: Config = {
   // API配置
   apiPrefix: process.env.API_PREFIX || '/api/v1',
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15分钟
-  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100', 10), // 100请求/15分钟
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '1000000', 10), // 1000000请求/15分钟
 };
 
 // 验证必要的环境变量

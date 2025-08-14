@@ -28,6 +28,7 @@ interface WeixinAccount {
 interface PicItem {
   pid: number;
   url: string;
+  image_path?: string;
   isUnfit: boolean;
 }
 
@@ -37,7 +38,6 @@ const WeixinPublish: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<WeixinAccount | null>(null);
   const [picList, setPicList] = useState<PicItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [publishProgress, setPublishProgress] = useState(0);
 
   // 获取微信公众号账户列表
@@ -94,54 +94,10 @@ const WeixinPublish: React.FC = () => {
     }
   };
 
-  // 步骤2：下载图片
+  // 步骤2：下载图片（已废弃，现在自动下载）
   const handleDownload = async () => {
-    try {
-      setLoading(true);
-      
-      // 调用后端API开始下载
-      const pids = picList.map(pic => pic.pid);
-      const response = await weixinPublishAPI.downloadPics(pids);
-      
-      if (response.success && response.data?.task_id) {
-        const taskId = response.data.task_id;
-        
-        // 轮询下载进度
-        const progressInterval = setInterval(async () => {
-          try {
-            const progressResponse = await weixinPublishAPI.getDownloadProgress(taskId);
-            
-            if (progressResponse.success && progressResponse.data) {
-              const { progress, status } = progressResponse.data;
-              setDownloadProgress(progress);
-              
-              if (status === 'completed') {
-                clearInterval(progressInterval);
-                setPicList(prev => prev.map(pic => ({
-                  ...pic,
-                  url: `/tmp/pic_${pic.pid}.jpg`,
-                })));
-                message.success('图片下载完成');
-                setLoading(false);
-              } else if (status === 'failed') {
-                clearInterval(progressInterval);
-                message.error('下载图片失败');
-                setLoading(false);
-              }
-            }
-          } catch (error) {
-            console.error('获取下载进度失败:', error);
-          }
-        }, 1000);
-      } else {
-        message.error(response.error || '开始下载失败');
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('下载图片失败:', error);
-      message.error('下载图片失败');
-      setLoading(false);
-    }
+    // 这个方法已不再使用，下载现在是自动的
+    console.log('下载现在是自动的，无需手动触发');
   };
 
   // 步骤3：标记图片
@@ -150,6 +106,39 @@ const WeixinPublish: React.FC = () => {
       pic.pid === pid ? { ...pic, isUnfit: !pic.isUnfit } : pic
     ));
   };
+
+  // 实时更新图片下载状态
+  useEffect(() => {
+    if (currentStep === 2 && picList.length > 0) {
+      const updateImageStatus = async () => {
+        try {
+          const pids = picList.map(pic => pic.pid);
+          const response = await weixinPublishAPI.checkDownloadStatus(pids);
+          
+          if (response.success && response.data) {
+            setPicList(prev => prev.map(pic => {
+              const status = response.data.find((item: any) => item.pid === pic.pid);
+              return {
+                ...pic,
+                image_path: status?.image_path || pic.image_path,
+                url: status?.image_path || pic.url,
+              };
+            }));
+          }
+        } catch (error) {
+          console.error('更新图片状态失败:', error);
+        }
+      };
+
+      // 每秒更新一次状态
+      const interval = setInterval(updateImageStatus, 1000);
+      
+      // 立即执行一次
+      updateImageStatus();
+
+      return () => clearInterval(interval);
+    }
+  }, [currentStep, picList.length]);
 
   // 步骤4：发布
   const handlePublish = async () => {
@@ -246,10 +235,7 @@ const WeixinPublish: React.FC = () => {
       case 1:
         return (
           <Step2Download
-            picCount={picList.length}
-            downloadProgress={downloadProgress}
-            loading={loading}
-            onDownload={handleDownload}
+            picList={picList}
             onNext={() => setCurrentStep(2)}
           />
         );

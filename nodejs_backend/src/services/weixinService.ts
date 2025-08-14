@@ -20,7 +20,7 @@ export class WeixinService {
       // 构建查询条件
       let query = supabase
         .from('pic')
-        .select('pid, image_url, tag')
+        .select('pid, image_url, tag, image_path, popularity')
         .limit(limit);
 
       // 添加不支持标签的过滤条件
@@ -30,12 +30,12 @@ export class WeixinService {
         });
       }
 
-             // 添加支持标签的过滤条件
-       if (tags.length > 0) {
-         const tagConditions = tags.map(tag => `tag.ilike.%${tag}%`);
-         query = query.or(tagConditions.join(','));
-       }
-       // 如果标签为空，不添加标签过滤条件，返回所有符合条件的图片
+      // 添加支持标签的过滤条件
+      if (tags.length > 0) {
+        const tagConditions = tags.map(tag => `tag.ilike.%${tag}%`);
+        query = query.or(tagConditions.join(','));
+      }
+      // 如果标签为空，不添加标签过滤条件，返回所有符合条件的图片
 
       // 添加公众号使用状态过滤
       query = query.or(`wx_name.not.ilike.%${wx_name}%,wx_name.is.null`);
@@ -56,9 +56,84 @@ export class WeixinService {
       }
 
       console.log(`✅ 查询成功，找到 ${data?.length || 0} 张图片`);
+      
+      // 自动开始下载未下载的图片
+      if (data && data.length > 0) {
+        const undownloadedPids = data.filter(pic => !pic.image_path).map(pic => pic.pid);
+        if (undownloadedPids.length > 0) {
+          console.log(`📥 发现 ${undownloadedPids.length} 张未下载的图片，开始自动下载...`);
+          this.autoDownloadPics(undownloadedPids);
+        }
+      }
+      
       return data || [];
     } catch (error) {
       console.error('❌ 查询图片服务失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 自动下载图片到Pixiv服务
+   */
+  private static async autoDownloadPics(pids: number[]) {
+    try {
+      console.log(`🚀 开始自动下载 ${pids.length} 张图片到Pixiv服务...`);
+      
+      // 并发发送所有下载请求，不等待上一个完成
+      const downloadPromises = pids.map(async (pid) => {
+        try {
+          console.log(`📥 发送PID ${pid} 的下载请求...`);
+          return await this.downloadPidToPixiv(pid);
+        } catch (error) {
+          console.error(`❌ 自动下载图片 ${pid} 失败:`, error);
+          // 返回错误信息，不中断其他请求
+          return { error: true, pid, message: error instanceof Error ? error.message : String(error) };
+        }
+      });
+      
+      // 等待所有请求发送完成
+      const results = await Promise.all(downloadPromises);
+      
+      const successCount = results.filter((r: any) => !r.error).length;
+      const errorCount = results.filter((r: any) => r.error).length;
+      
+      console.log(`✅ 自动下载任务完成，共处理 ${pids.length} 个PID`);
+      console.log(`📊 成功发送: ${successCount} 个，失败: ${errorCount} 个`);
+    } catch (error) {
+      console.error('❌ 自动下载服务失败:', error);
+    }
+  }
+
+  /**
+   * 下载单个PID到Pixiv服务
+   */
+  private static async downloadPidToPixiv(pid: number) {
+    try {
+      console.log(`📥 开始下载PID ${pid} 到Pixiv服务...`);
+      
+      // 调用Pixiv下载API - 根据pixiv-crawler.ts的实际定义
+      const response = await fetch('https://pixiv.chaosyn.com/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'download',
+          downloadPid: pid.toString()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Pixiv API响应错误: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ PID ${pid} 下载请求已发送到Pixiv服务:`, result);
+      
+      return result;
+    } catch (error) {
+      console.error(`❌ 下载PID ${pid} 到Pixiv服务失败:`, error);
       throw error;
     }
   }
@@ -266,5 +341,42 @@ export class WeixinService {
       throw new Error('任务不存在');
     }
     return task;
+  }
+
+  /**
+   * 查询图片下载状态
+   */
+  static async checkDownloadStatus(pids: number[]) {
+    try {
+      console.log(`🔍 查询 ${pids.length} 张图片的下载状态...`);
+      
+      const { data, error } = await supabase
+        .from('pic')
+        .select('pid, image_path, popularity')
+        .in('pid', pids);
+
+      if (error) {
+        console.error('❌ 查询下载状态失败:', error);
+        throw new Error(`数据库查询失败: ${error.message}`);
+      }
+
+      // 构建状态映射
+      const statusMap = new Map();
+      pids.forEach(pid => {
+        const pic = data?.find(p => p.pid === pid);
+        statusMap.set(pid, {
+          pid,
+          downloaded: !!pic?.image_path,
+          image_path: pic?.image_path || null,
+          popularity: pic?.popularity || 0
+        });
+      });
+
+      console.log(`✅ 下载状态查询完成`);
+      return Array.from(statusMap.values());
+    } catch (error) {
+      console.error('❌ 查询下载状态服务失败:', error);
+      throw error;
+    }
   }
 } 

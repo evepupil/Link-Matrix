@@ -113,6 +113,12 @@ export const weixinPublishAPI = {
 
   // 获取发布进度
   getPublishProgress: (task_id: string) => request(`/weixin/publish-progress/${task_id}`),
+
+  // 检查下载状态
+  checkDownloadStatus: (pids: number[]) => request('/weixin/check-download-status', {
+    method: 'POST',
+    body: JSON.stringify({ pids }),
+  }),
 };
 
 // 通用API

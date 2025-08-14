@@ -6,7 +6,8 @@ const { Text } = Typography;
 
 interface PicItem {
   pid: number;
-  url: string;
+  url?: string;
+  image_path?: string;
   isUnfit: boolean;
 }
 
@@ -39,11 +40,12 @@ const Step3ImageSelection: React.FC<Step3Props> = ({ picList, onPicToggle, onNex
                 cursor: 'pointer',
               }}
             >
-              {pic.url ? (
+              {(pic.image_path || pic.url) ? (
                 <Image
-                  src={pic.url}
+                  src={pic.image_path || pic.url}
                   alt={`图片 ${pic.pid}`}
                   style={{ width: '100%', height: 120, objectFit: 'cover' }}
+                  preview={false}
                 />
               ) : (
                 <div style={{ 
@@ -54,7 +56,7 @@ const Step3ImageSelection: React.FC<Step3Props> = ({ picList, onPicToggle, onNex
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Text>图片 {pic.pid}</Text>
+                  <Text>下载中...</Text>
                 </div>
               )}
               
