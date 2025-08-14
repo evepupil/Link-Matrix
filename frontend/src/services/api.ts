@@ -85,6 +85,8 @@ export const weixinPublishAPI = {
     wx_name: string;
     tags: string[];
     unsupport_tags: string[];
+    limit?: number;
+    popularity?: number;
   }) => request('/weixin/query-pics', {
     method: 'POST',
     body: JSON.stringify(params),

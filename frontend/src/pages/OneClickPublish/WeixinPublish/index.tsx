@@ -71,6 +71,8 @@ const WeixinPublish: React.FC = () => {
         wx_name: account?.wx_id || '',
         tags: selectedTags,
         unsupport_tags: [], // 暂时为空，后续可以从账户配置中获取
+        limit: values.picCount || 12,
+        popularity: values.popularity || 0.15,
       });
 
       if (response.success && response.data) {

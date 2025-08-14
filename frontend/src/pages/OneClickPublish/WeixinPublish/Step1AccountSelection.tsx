@@ -88,11 +88,27 @@ const Step1AccountSelection: React.FC<Step1Props> = ({ accounts, loading, onNext
           name="picCount"
           label="图片数量"
           rules={[{ required: true, message: '请设置图片数量' }]}
+          initialValue={12}
         >
           <InputNumber
             min={1}
             max={50}
             placeholder="请输入图片数量"
+            style={{ width: '100%' }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="popularity"
+          label="最低热度值"
+          rules={[{ required: true, message: '请设置最低热度值' }]}
+          initialValue={0.15}
+        >
+          <InputNumber
+            min={0}
+            max={1}
+            step={0.01}
+            placeholder="请输入最低热度值"
             style={{ width: '100%' }}
           />
         </Form.Item>

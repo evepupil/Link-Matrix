@@ -11,7 +11,7 @@ export class WeixinService {
    * 查询符合条件的图片
    * 参考Python代码的SQL查询逻辑
    */
-  static async queryPics(wx_name: string, tags: string[], unsupport_tags: string[], limit: number = 10) {
+  static async queryPics(wx_name: string, tags: string[], unsupport_tags: string[], limit: number = 10, popularity: number = 0) {
     try {
       console.log(`🔍 开始查询图片，公众号: ${wx_name}`);
       console.log(`🏷️ 支持标签: ${tags.join(', ')}`);
@@ -39,6 +39,11 @@ export class WeixinService {
 
       // 添加公众号使用状态过滤
       query = query.or(`wx_name.not.ilike.%${wx_name}%,wx_name.is.null`);
+
+      // 添加热度过滤条件
+      if (popularity > 0) {
+        query = query.gte('popularity', popularity);
+      }
 
       // 添加unfit过滤条件
       query = query.not('unfit', 'eq', true);

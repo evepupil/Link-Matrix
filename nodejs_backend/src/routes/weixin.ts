@@ -10,7 +10,7 @@ const router = express.Router();
  */
 router.post('/query-pics', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { wx_name, tags, unsupport_tags, limit = 10 } = req.body;
+    const { wx_name, tags, unsupport_tags, limit = 10, popularity = 0.15 } = req.body;
 
     // 验证参数
     if (!wx_name || !tags || !Array.isArray(tags) || !Array.isArray(unsupport_tags)) {
@@ -18,7 +18,7 @@ router.post('/query-pics', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const pics = await WeixinService.queryPics(wx_name, tags, unsupport_tags, limit);
+    const pics = await WeixinService.queryPics(wx_name, tags, unsupport_tags, limit, popularity);
     res.status(200).json(createApiResponse(true, pics));
   } catch (error) {
     console.error('查询图片失败:', error);
