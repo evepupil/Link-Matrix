@@ -62,10 +62,17 @@ const WeixinPublish: React.FC = () => {
   };
 
   // 查询图片的通用函数
-  const queryPictures = async (searchParams: any) => {
+  const queryPictures = async (searchParams: any, autoDownload: boolean = false) => {
     try {
       setLoading(true);
-      const response = await weixinPublishAPI.queryPics(searchParams);
+      
+      // 添加autoDownload参数
+      const queryParams = {
+        ...searchParams,
+        autoDownload
+      };
+      
+      const response = await weixinPublishAPI.queryPics(queryParams);
 
       if (response.success && response.data) {
         const pics = response.data.slice(0, searchParams.limit).map((pic: any) => ({
@@ -109,7 +116,8 @@ const WeixinPublish: React.FC = () => {
     // 保存搜索参数用于换一批
     setLastSearchParams(searchParams);
 
-    const success = await queryPictures(searchParams);
+    // 初始查询时不启用自动下载，让用户选择下载方式
+    const success = await queryPictures(searchParams, false);
     if (success) {
       setCurrentStep(1); // 进入下载选择界面
     }
@@ -140,7 +148,10 @@ const WeixinPublish: React.FC = () => {
   // 换一批图片
   const handleRefreshPics = async () => {
     if (lastSearchParams) {
-      const success = await queryPictures(lastSearchParams);
+      // 换一批时保持与当前下载方式一致
+      // 如果用户选择了本地下载，则不启用自动下载
+      const autoDownload = false; // 本地下载模式下禁用自动下载
+      const success = await queryPictures(lastSearchParams, autoDownload);
       if (success) {
         message.success('已为您换了一批新图片');
       }

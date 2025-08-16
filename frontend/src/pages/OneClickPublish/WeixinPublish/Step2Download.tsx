@@ -30,7 +30,7 @@ const Step2Download: React.FC<Step2Props> = ({ picList, onNext, onLocalDownload,
 
     const checkProgress = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/weixin/check-download-status', {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/weixin/check-download-status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pids }),

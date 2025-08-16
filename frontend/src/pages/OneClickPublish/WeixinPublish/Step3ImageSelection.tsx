@@ -74,7 +74,7 @@ const Step3ImageSelection: React.FC<Step3Props> = ({ picList, onNext, onBack, on
     // 并发下载所有合格图片
     const downloadPromises = pendingPics.map(async (pic) => {
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/weixin/download-local`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/weixin/download-local`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pid: pic.pid }),

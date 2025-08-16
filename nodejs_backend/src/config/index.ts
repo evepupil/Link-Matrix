@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
 
 // 加载环境变量
 dotenv.config();
@@ -36,7 +37,7 @@ export interface Config {
 const config: Config = {
   // 服务器配置
   port: parseInt(process.env.PORT || '8000', 10),
-  host: process.env.HOST || 'localhost',
+  host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'development',
   
   // Supabase配置
@@ -46,7 +47,7 @@ const config: Config = {
   // CORS配置
   corsOrigins: process.env.CORS_ORIGINS 
     ? process.env.CORS_ORIGINS.split(',') 
-    : ['http://localhost:3000', 'http://localhost:3001'],
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
   
   // 日志配置
   logLevel: process.env.LOG_LEVEL || 'info',

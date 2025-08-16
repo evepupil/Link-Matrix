@@ -7,14 +7,14 @@ const router = express.Router();
 // 查询符合条件的图片
 router.post('/query-pics', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { wx_name, tags, unsupport_tags, limit = 10, popularity = 0.15 } = req.body;
+    const { wx_name, tags, unsupport_tags, limit = 10, popularity = 0.15, autoDownload = false } = req.body;
     
     if (!wx_name || !tags || !Array.isArray(tags)) {
       res.status(400).json(createApiResponse(false, undefined, undefined, '参数错误'));
       return;
     }
 
-    const pics = await WeixinService.queryPics(wx_name, tags, unsupport_tags, limit, popularity);
+    const pics = await WeixinService.queryPics(wx_name, tags, unsupport_tags, limit, popularity, autoDownload);
     res.status(200).json(createApiResponse(true, pics));
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '未知错误';

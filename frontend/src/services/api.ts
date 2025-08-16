@@ -1,5 +1,5 @@
 // API基础配置
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 // 通用请求函数
 const request = async (endpoint: string, options: RequestInit = {}) => {
@@ -87,6 +87,7 @@ export const weixinPublishAPI = {
     unsupport_tags: string[];
     limit?: number;
     popularity?: number;
+    autoDownload?: boolean;
   }) => request('/weixin/query-pics', {
     method: 'POST',
     body: JSON.stringify(params),

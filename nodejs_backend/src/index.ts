@@ -8,6 +8,7 @@ import fs from 'fs';
 
 import config, { validateConfig, isUsingSupabase, getSupabaseConnectionInfo } from '@/config';
 import { testSupabaseConnection, initSupabaseTables } from '@/services/supabase';
+import { corsDebugMiddleware, getCorsInfo } from '@/utils/corsDebug';
 import accountsRouter from '@/routes/accounts';
 import weixinRouter from '@/routes/weixin';
 
@@ -29,11 +30,38 @@ const setupMiddleware = () => {
   // 安全头
   app.use(helmet());
   
-  // CORS
-  app.use(cors({
-    origin: config.corsOrigins,
-    credentials: true
-  }));
+  // CORS - 支持动态域名和开发环境
+  const corsOptions = {
+    origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+      // 允许没有origin的请求（比如移动端应用、Postman等）
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      // 检查是否在允许的域名列表中
+      const isAllowed = config.corsOrigins.some(allowedOrigin => {
+        // 支持通配符匹配
+        if (allowedOrigin.includes('*')) {
+          const pattern = allowedOrigin.replace('*', '.*');
+          return new RegExp(pattern).test(origin);
+        }
+        return allowedOrigin === origin;
+      });
+      
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log(`🚫 CORS blocked request from: ${origin}`);
+        console.log(`✅ Allowed origins: ${config.corsOrigins.join(', ')}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  };
+  
+  app.use(cors(corsOptions));
   
   // 请求日志
   app.use(morgan('combined', {

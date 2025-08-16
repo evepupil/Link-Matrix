@@ -12,11 +12,12 @@ export class WeixinService {
    * 查询符合条件的图片
    * 参考Python代码的SQL查询逻辑
    */
-  static async queryPics(wx_name: string, tags: string[], unsupport_tags: string[], limit: number = 10, popularity: number = 0) {
+  static async queryPics(wx_name: string, tags: string[], unsupport_tags: string[], limit: number = 10, popularity: number = 0, autoDownload: boolean = false) {
     try {
       console.log(`🔍 开始查询图片，公众号: ${wx_name}`);
       console.log(`🏷️ 支持标签: ${tags.join(', ')}`);
       console.log(`❌ 不支持标签: ${unsupport_tags.join(', ')}`);
+      console.log(`📥 自动下载: ${autoDownload ? '启用' : '禁用'}`);
 
       // 构建查询条件
       let query = supabase
@@ -58,12 +59,17 @@ export class WeixinService {
 
       console.log(`✅ 查询成功，找到 ${data?.length || 0} 张图片`);
       
-      // 自动开始下载未下载的图片
-      if (data && data.length > 0) {
+      // 只有在启用自动下载时才执行云端下载
+      if (autoDownload && data && data.length > 0) {
         const undownloadedPids = data.filter(pic => !pic.image_path).map(pic => pic.pid);
         if (undownloadedPids.length > 0) {
           console.log(`📥 发现 ${undownloadedPids.length} 张未下载的图片，开始自动下载...`);
           this.autoDownloadPics(undownloadedPids);
+        }
+      } else if (data && data.length > 0) {
+        const undownloadedPids = data.filter(pic => !pic.image_path).map(pic => pic.pid);
+        if (undownloadedPids.length > 0) {
+          console.log(`ℹ️ 发现 ${undownloadedPids.length} 张未下载的图片，但自动下载已禁用`);
         }
       }
       
