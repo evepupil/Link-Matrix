@@ -72,6 +72,7 @@ const WeixinPublish: React.FC = () => {
           pid: pic.pid,
           url: pic.image_url || '',
           image_path: pic.image_path || '',
+          author_name: pic.author_name || '',
           isUnfit: false,
           downloadStatus: 'pending' as const,
           downloadProgress: 0,
@@ -215,6 +216,7 @@ const WeixinPublish: React.FC = () => {
         return (
           <Step4Publish
             selectedPics={picList}
+            accountId={selectedAccount?.id || 0}
             onComplete={handlePublishComplete}
             onBack={handleBack}
           />

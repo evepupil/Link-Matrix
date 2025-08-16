@@ -86,8 +86,26 @@ router.post('/publish', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const result = await WeixinService.publishToWeixin(account_id, pids, unfit_pids);
-    res.status(200).json(createApiResponse(true, result));
+    const taskId = await WeixinService.publishToWeixin(account_id, pids, unfit_pids || []);
+    res.status(200).json(createApiResponse(true, { task_id: taskId }));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    res.status(500).json(createApiResponse(false, undefined, undefined, `发布失败: ${errorMessage}`));
+  }
+});
+
+// 直接发布到微信公众号（不使用任务队列）
+router.post('/publish-direct', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { account_id, pids, unfit_pids } = req.body;
+    
+    if (!account_id || !pids || !Array.isArray(pids)) {
+      res.status(400).json(createApiResponse(false, undefined, undefined, '参数错误'));
+      return;
+    }
+
+    const result = await WeixinService.publishToWeixinReal(account_id, pids, unfit_pids || []);
+    res.status(200).json(createApiResponse(result.success, result.success ? { media_id: result.media_id } : undefined, undefined, result.error));
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     res.status(500).json(createApiResponse(false, undefined, undefined, `发布失败: ${errorMessage}`));

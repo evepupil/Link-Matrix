@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Image, Checkbox, Button, Row, Col, Typography, Space, Progress, Alert, Divider } from 'antd';
+import { Card, Image, Checkbox, Button, Row, Col, Typography, Space, Progress, Alert, Divider, message } from 'antd';
 import { CheckCircleOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -8,6 +8,7 @@ interface PicItem {
   pid: number;
   url?: string; // Original URL
   image_path?: string; // CF R2 public link
+  author_name?: string; // 作者名称
   isUnfit: boolean;
   localPath?: string; // 本地下载路径
   downloadStatus?: 'pending' | 'downloading' | 'completed' | 'failed';
@@ -46,11 +47,21 @@ const Step3ImageSelection: React.FC<Step3Props> = ({ picList, onNext, onBack, on
     ));
   };
 
-  // 开始本地下载
+  // 开始本地下载（只下载合格的图片）
   const startLocalDownload = async () => {
-    const pendingPics = pics.filter(pic => !pic.localPath && pic.downloadStatus !== 'completed');
-    if (pendingPics.length === 0) return;
+    // 只下载合格的图片（未标记为不合格且未下载完成的）
+    const pendingPics = pics.filter(pic => 
+      !pic.isUnfit && 
+      !pic.localPath && 
+      pic.downloadStatus !== 'completed'
+    );
+    
+    if (pendingPics.length === 0) {
+      message.info('没有需要下载的合格图片');
+      return;
+    }
 
+    console.log(`开始下载 ${pendingPics.length} 张合格图片`);
     setDownloadingCount(pendingPics.length);
     
     // 更新状态为下载中
@@ -60,7 +71,7 @@ const Step3ImageSelection: React.FC<Step3Props> = ({ picList, onNext, onBack, on
         : pic
     ));
 
-    // 并发下载所有图片
+    // 并发下载所有合格图片
     const downloadPromises = pendingPics.map(async (pic) => {
       try {
         const response = await fetch(`http://localhost:8000/api/v1/weixin/download-local`, {
@@ -217,6 +228,14 @@ const Step3ImageSelection: React.FC<Step3Props> = ({ picList, onNext, onBack, on
               {/* 图片信息 */}
               <div style={{ textAlign: 'center' }}>
                 <Text strong>PID: {pic.pid}</Text>
+                {pic.author_name && (
+                  <>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      作者: {pic.author_name}
+                    </Text>
+                  </>
+                )}
                 <br />
                 <Text type="secondary" style={{ fontSize: '12px' }}>
                   {pic.localPath ? '本地已下载' : '使用代理显示'}

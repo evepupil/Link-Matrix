@@ -2,6 +2,7 @@ import supabase from '@/services/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import { WeixinAPI, WeixinConfig, ArticleData } from './weixinAPI';
 
 // 任务状态存储（实际项目中应该使用Redis或数据库）
 const taskProgress = new Map<string, { progress: number; status: string; result?: any }>();
@@ -20,7 +21,7 @@ export class WeixinService {
       // 构建查询条件
       let query = supabase
         .from('pic')
-        .select('pid, image_url, tag, image_path, popularity')
+        .select('pid, image_url, tag, image_path, popularity, author_name')
         .limit(limit);
 
       // 添加不支持标签的过滤条件
@@ -206,15 +207,41 @@ export class WeixinService {
    * 下载单张图片
    */
   private static async downloadSinglePic(pid: number, tmpDir: string): Promise<void> {
-    // 模拟下载过程
-    const fileName = `pic_${pid}.jpg`;
-    const filePath = path.join(tmpDir, fileName);
-    
-    // 这里应该实现真实的图片下载逻辑
-    // 目前只是创建空文件作为示例
-    fs.writeFileSync(filePath, '');
-    
-    console.log(`📥 图片 ${pid} 下载完成: ${filePath}`);
+    try {
+      // 获取图片信息，包括作者名称
+      const { data: picData, error: picError } = await supabase
+        .from('pic')
+        .select('pid, author_name')
+        .eq('pid', pid)
+        .single();
+
+      if (picError || !picData) {
+        console.warn(`⚠️ 无法获取PID ${pid} 的图片信息，使用默认命名`);
+        const fileName = `pid_${pid}.jpg`;
+        const filePath = path.join(tmpDir, fileName);
+        fs.writeFileSync(filePath, '');
+        console.log(`📥 图片 ${pid} 下载完成: ${filePath}`);
+        return;
+      }
+
+      // 使用新的命名格式：@作者名称 pid_xxx
+      const authorName = picData.author_name || 'unknown';
+      const fileName = `@${authorName} pid_${pid}.jpg`;
+      const filePath = path.join(tmpDir, fileName);
+      
+      // 这里应该实现真实的图片下载逻辑
+      // 目前只是创建空文件作为示例
+      fs.writeFileSync(filePath, '');
+      
+      console.log(`📥 图片 ${pid} (作者: ${authorName}) 下载完成: ${filePath}`);
+    } catch (error) {
+      console.error(`❌ 下载图片 ${pid} 失败:`, error);
+      // 如果出错，使用默认命名格式
+      const fileName = `pid_${pid}.jpg`;
+      const filePath = path.join(tmpDir, fileName);
+      fs.writeFileSync(filePath, '');
+      console.log(`📥 图片 ${pid} 使用默认命名下载完成: ${filePath}`);
+    }
   }
 
   /**
@@ -228,12 +255,12 @@ export class WeixinService {
     return task;
   }
 
-  /**
+    /**
    * 发布到微信公众号
    */
   static async publishToWeixin(account_id: number, pids: number[], unfit_pids: number[]): Promise<string> {
     const taskId = uuidv4();
-    
+
     // 初始化任务状态
     taskProgress.set(taskId, { progress: 0, status: 'publishing' });
 
@@ -241,6 +268,163 @@ export class WeixinService {
     this.executePublishTask(taskId, account_id, pids, unfit_pids);
 
     return taskId;
+  }
+
+  /**
+   * 实际的微信发布功能（使用真实的微信API）
+   */
+  static async publishToWeixinReal(account_id: number, pids: number[], unfit_pids: number[]): Promise<{ success: boolean; media_id?: string; error?: string }> {
+    try {
+      console.log(`🚀 开始真实微信发布流程...`);
+      console.log(`📊 账户ID: ${account_id}, 发布图片: ${pids.length} 张, 不合格图片: ${unfit_pids.length} 张`);
+
+      // 1. 获取微信账户配置
+      const { data: accountData, error: accountError } = await supabase
+        .from('api_accounts_wx')
+        .select('*')
+        .eq('id', account_id)
+        .single();
+
+      if (accountError || !accountData) {
+        throw new Error(`获取微信账户配置失败: ${accountError?.message || '账户不存在'}`);
+      }
+
+      console.log(`✅ 获取账户配置成功: ${accountData.name}`);
+
+      // 2. 创建临时目录并复制图片
+      const tempDir = path.join(process.cwd(), 'tmp', `article_${Date.now()}`);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      console.log(`📁 创建临时目录: ${tempDir}`);
+
+      // 3. 复制已下载的图片到临时目录
+      const finalPids: string[] = [];
+      for (const pid of pids) {
+        // 查找包含该PID的图片文件（支持新的命名格式）
+        const tmpDir = path.join(process.cwd(), 'tmp');
+        const files = fs.readdirSync(tmpDir);
+        const targetFile = files.find(file => file.includes(`pid_${pid}`));
+        
+        if (targetFile) {
+          const sourcePath = path.join(tmpDir, targetFile);
+          const targetPath = path.join(tempDir, targetFile);
+          fs.copyFileSync(sourcePath, targetPath);
+          finalPids.push(pid.toString());
+          console.log(`📋 复制图片 PID ${pid} (${targetFile}) 到临时目录`);
+        } else {
+          console.warn(`⚠️ 图片文件不存在: PID ${pid}`);
+        }
+      }
+
+      if (finalPids.length === 0) {
+        throw new Error('没有可用的图片文件');
+      }
+
+      // 4. 初始化微信API
+      const weixinAPI = new WeixinAPI(accountData.appid, accountData.app_secret);
+
+      // 5. 上传图片到微信素材库
+      console.log(`📤 开始上传 ${finalPids.length} 张图片到微信素材库...`);
+      const uploadedPids = await weixinAPI.addMediaAndReturnPids(tempDir);
+
+      if (uploadedPids.length === 0) {
+        throw new Error('图片上传失败');
+      }
+
+      console.log(`✅ 成功上传 ${uploadedPids.length} 张图片到微信素材库`);
+
+      // 6. 创建文章内容
+      const currentDate = new Date();
+      const dateStr = currentDate.toISOString().split('T')[0].replace(/-/g, '');
+      const title = `${accountData.title || '每日萌图'} ${dateStr}`;
+
+      const articleData: ArticleData = {
+        title: title,
+        author: accountData.author || '编辑部',
+        content: '', // 内容由WeixinAPI生成
+        thumb_media_id: accountData.thumb_media_id || '',
+        digest: '喜欢的话就点个在看吧',
+        need_open_comment: 1,
+        only_fans_can_comment: 1
+      };
+
+      // 7. 创建草稿文章
+      console.log(`📝 创建草稿文章: ${title}`);
+      const publishResult = await weixinAPI.addDraft(articleData);
+
+      if (!publishResult.success) {
+        throw new Error(`创建草稿失败: ${publishResult.error}`);
+      }
+
+      // 8. 更新数据库
+      await this.updateDatabaseAfterPublish(uploadedPids, unfit_pids, accountData.wx_id);
+
+      // 9. 清理临时目录
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        console.log(`🗑️ 清理临时目录: ${tempDir}`);
+      } catch (error) {
+        console.warn(`⚠️ 清理临时目录失败: ${error}`);
+      }
+
+      console.log(`🎉 微信发布完成！media_id: ${publishResult.media_id}`);
+      
+      return {
+        success: true,
+        media_id: publishResult.media_id
+      };
+
+    } catch (error) {
+      console.error('❌ 微信发布失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * 更新数据库：标记不合格图片，更新图片的wx_name
+   */
+  private static async updateDatabaseAfterPublish(publishedPids: string[], unfitPids: number[], wxName: string) {
+    try {
+      console.log(`📊 开始更新数据库...`);
+
+      // 1. 标记不合格图片
+      if (unfitPids.length > 0) {
+        const { error: unfitError } = await supabase
+          .from('pic')
+          .update({ unfit: true })
+          .in('pid', unfitPids);
+
+        if (unfitError) {
+          console.error('❌ 更新不合格图片失败:', unfitError);
+        } else {
+          console.log(`✅ 标记 ${unfitPids.length} 张图片为不合格`);
+        }
+      }
+
+      // 2. 更新发布图片的wx_name
+      if (publishedPids.length > 0) {
+        const publishedPidsNum = publishedPids.map(pid => parseInt(pid));
+        const { error: wxNameError } = await supabase
+          .from('pic')
+          .update({ wx_name: wxName })
+          .in('pid', publishedPidsNum);
+
+        if (wxNameError) {
+          console.error('❌ 更新图片wx_name失败:', wxNameError);
+        } else {
+          console.log(`✅ 更新 ${publishedPids.length} 张图片的wx_name为: ${wxName}`);
+        }
+      }
+
+      console.log(`✅ 数据库更新完成`);
+    } catch (error) {
+      console.error('❌ 数据库更新异常:', error);
+    }
   }
 
   /**
@@ -253,40 +437,40 @@ export class WeixinService {
       console.log(`🖼️ 发布图片: ${pids.length} 张`);
       console.log(`❌ 不合格图片: ${unfit_pids.length} 张`);
 
-      // 更新数据库中图片的使用状态
-      await this.updatePicUsageStatus(pids, unfit_pids);
-
-      const totalSteps = 3; // 模拟发布步骤
-      let currentStep = 0;
-
-      // 步骤1: 准备发布内容
-      currentStep++;
-      const progress = Math.round((currentStep / totalSteps) * 100);
-      taskProgress.set(taskId, { progress, status: 'publishing' });
+      // 步骤1: 准备发布 (20%)
+      taskProgress.set(taskId, { progress: 20, status: 'publishing' });
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 步骤2: 上传到微信公众号
-      currentStep++;
-      const progress2 = Math.round((currentStep / totalSteps) * 100);
-      taskProgress.set(taskId, { progress: progress2, status: 'publishing' });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 步骤2: 调用真实的微信发布API (50%)
+      taskProgress.set(taskId, { progress: 50, status: 'publishing' });
+      const publishResult = await this.publishToWeixinReal(account_id, pids, unfit_pids);
 
-      // 步骤3: 发布完成
-      currentStep++;
-      taskProgress.set(taskId, { 
-        progress: 100, 
+      if (!publishResult.success) {
+        throw new Error(publishResult.error || '发布失败');
+      }
+
+      // 步骤3: 发布完成 (100%)
+      taskProgress.set(taskId, {
+        progress: 100,
         status: 'completed',
-        result: { 
+        result: {
           published_count: pids.length - unfit_pids.length,
           unfit_count: unfit_pids.length,
-          account_id 
+          account_id,
+          media_id: publishResult.media_id
         }
       });
 
-      console.log(`✅ 发布任务 ${taskId} 完成`);
+      console.log(`✅ 发布任务 ${taskId} 完成，media_id: ${publishResult.media_id}`);
     } catch (error) {
       console.error(`❌ 发布任务 ${taskId} 失败:`, error);
-      taskProgress.set(taskId, { progress: 0, status: 'failed' });
+      taskProgress.set(taskId, { 
+        progress: 0, 
+        status: 'failed',
+        result: {
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
     }
   }
 
@@ -394,14 +578,50 @@ export class WeixinService {
         fs.mkdirSync(tmpDir, { recursive: true });
       }
       
-      // 检查是否已经下载过
-      const localPath = path.join(tmpDir, `pid_${pid}.jpg`);
-      if (fs.existsSync(localPath)) {
-        console.log(`✅ 图片 ${pid} 已存在于本地: ${localPath}`);
+      // 获取图片信息，包括作者名称
+      const { data: picData, error: picError } = await supabase
+        .from('pic')
+        .select('pid, author_name')
+        .eq('pid', pid)
+        .single();
+
+      if (picError || !picData) {
+        console.warn(`⚠️ 无法获取PID ${pid} 的图片信息，使用默认命名`);
+        const localPath = path.join(tmpDir, `pid_${pid}.jpg`);
+        if (fs.existsSync(localPath)) {
+          console.log(`✅ 图片 ${pid} 已存在于本地: ${localPath}`);
+          return {
+            success: true,
+            pid,
+            localPath: localPath,
+            message: '图片已存在于本地'
+          };
+        }
+      } else {
+        // 使用新的命名格式：@作者名称 pid_xxx
+        const authorName = picData.author_name || 'unknown';
+        const fileName = `@${authorName} pid_${pid}.jpg`;
+        const localPath = path.join(tmpDir, fileName);
+        
+        if (fs.existsSync(localPath)) {
+          console.log(`✅ 图片 ${pid} (作者: ${authorName}) 已存在于本地: ${localPath}`);
+          return {
+            success: true,
+            pid,
+            localPath: localPath,
+            message: '图片已存在于本地'
+          };
+        }
+      }
+
+      // 检查是否已经下载过（兼容旧格式）
+      const oldLocalPath = path.join(tmpDir, `pid_${pid}.jpg`);
+      if (fs.existsSync(oldLocalPath)) {
+        console.log(`✅ 图片 ${pid} 已存在于本地（旧格式）: ${oldLocalPath}`);
         return {
           success: true,
           pid,
-          localPath: localPath,
+          localPath: oldLocalPath,
           message: '图片已存在于本地'
         };
       }
@@ -464,16 +684,31 @@ export class WeixinService {
         throw new Error('所有尺寸都无法下载或文件过大');
       }
       
-      // 保存到本地
-      fs.writeFileSync(localPath, imageBuffer);
+      // 确定最终的文件名和路径
+      let finalFileName: string;
+      let finalLocalPath: string;
       
-      console.log(`💾 图片 ${pid} 已保存到本地: ${localPath}`);
+      if (picData && picData.author_name) {
+        // 使用新的命名格式：@作者名称 pid_xxx
+        const authorName = picData.author_name;
+        finalFileName = `@${authorName} pid_${pid}.jpg`;
+        finalLocalPath = path.join(tmpDir, finalFileName);
+      } else {
+        // 使用默认命名格式
+        finalFileName = `pid_${pid}.jpg`;
+        finalLocalPath = path.join(tmpDir, finalFileName);
+      }
+      
+      // 保存到本地
+      fs.writeFileSync(finalLocalPath, imageBuffer);
+      
+      console.log(`💾 图片 ${pid} 已保存到本地: ${finalLocalPath}`);
       console.log(`📊 最终尺寸: ${selectedSize}，文件大小: ${(downloadedSize / 1024 / 1024).toFixed(2)}MB`);
       
       return {
         success: true,
         pid,
-        localPath: localPath,
+        localPath: finalLocalPath,
         size: selectedSize,
         fileSize: downloadedSize,
         message: '本地下载成功'

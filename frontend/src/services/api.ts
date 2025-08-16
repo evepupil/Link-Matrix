@@ -98,12 +98,28 @@ export const weixinPublishAPI = {
     body: JSON.stringify({ pids }),
   }),
 
-  // 上传到微信公众号
+  // 本地下载图片
+  downloadLocal: (pid: number) => request('/weixin/download-local', {
+    method: 'POST',
+    body: JSON.stringify({ pid }),
+  }),
+
+  // 上传到微信公众号（任务队列）
   publishToWeixin: (data: {
     account_id: number;
     pids: number[];
     unfit_pids: number[];
   }) => request('/weixin/publish', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // 直接上传到微信公众号
+  publishToWeixinDirect: (data: {
+    account_id: number;
+    pids: number[];
+    unfit_pids: number[];
+  }) => request('/weixin/publish-direct', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
