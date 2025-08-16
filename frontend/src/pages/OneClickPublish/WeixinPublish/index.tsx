@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Steps, Spin, message, Typography } from 'antd';
-import { 
-  WechatOutlined, 
-  DownloadOutlined, 
-  CheckCircleOutlined, 
-  UploadOutlined,
-  CheckCircleFilled 
-} from '@ant-design/icons';
-
+import { WechatOutlined, DownloadOutlined, CheckCircleOutlined, UploadOutlined, CheckCircleFilled } from '@ant-design/icons';
 import Step1AccountSelection from './Step1AccountSelection';
 import Step2Download from './Step2Download';
 import Step3ImageSelection from './Step3ImageSelection';
 import Step4Publish from './Step4Publish';
 import Step5Complete from './Step5Complete';
-
 import { apiAccountAPI, weixinPublishAPI } from '@/services/api';
 
 const { Title } = Typography;
@@ -21,15 +13,24 @@ const { Title } = Typography;
 interface WeixinAccount {
   id: number;
   name: string;
+  appid: string;
+  app_secret: string;
   wx_id: string;
+  title: string;
+  author: string;
+  thumb_media_id?: string;
   illust_tag: string[][];
+  status: string;
 }
 
 interface PicItem {
   pid: number;
-  url: string;
+  url?: string;
   image_path?: string;
   isUnfit: boolean;
+  localPath?: string;
+  downloadStatus?: 'pending' | 'downloading' | 'completed' | 'failed';
+  downloadProgress?: number;
 }
 
 const WeixinPublish: React.FC = () => {
@@ -39,6 +40,7 @@ const WeixinPublish: React.FC = () => {
   const [picList, setPicList] = useState<PicItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [publishProgress, setPublishProgress] = useState(0);
+  const [lastSearchParams, setLastSearchParams] = useState<any>(null); // 保存最后的搜索参数
 
   // 获取微信公众号账户列表
   useEffect(() => {
@@ -48,180 +50,139 @@ const WeixinPublish: React.FC = () => {
   const fetchAccounts = async () => {
     try {
       const response = await apiAccountAPI.getAll();
-      if (response.success) {
+      if (response.success && response.data) {
         setAccounts(response.data);
+      } else {
+        message.error('获取微信公众号账户失败');
       }
     } catch (error) {
+      console.error('获取微信公众号账户失败:', error);
       message.error('获取微信公众号账户失败');
     }
   };
 
-  // 步骤1：选择账户和标签
-  const handleStep1Next = async (values: any) => {
+  // 查询图片的通用函数
+  const queryPictures = async (searchParams: any) => {
     try {
-      const account = accounts.find(acc => acc.id === values.accountId);
-      setSelectedAccount(account || null);
       setLoading(true);
-
-      // 将选中的标签索引转换为实际的标签数组
-      const selectedTags = values.tags?.map((index: number) => account?.illust_tag[index]).flat() || [];
-
-      // 调用后端API查询图片
-      const response = await weixinPublishAPI.queryPics({
-        wx_name: account?.wx_id || '',
-        tags: selectedTags,
-        unsupport_tags: [], // 暂时为空，后续可以从账户配置中获取
-        limit: values.picCount || 12,
-        popularity: values.popularity || 0.15,
-      });
+      const response = await weixinPublishAPI.queryPics(searchParams);
 
       if (response.success && response.data) {
-        const pics = response.data.slice(0, values.picCount).map((pic: any) => ({
+        const pics = response.data.slice(0, searchParams.limit).map((pic: any) => ({
           pid: pic.pid,
-          url: pic.url || '',
+          url: pic.image_url || '',
+          image_path: pic.image_path || '',
           isUnfit: false,
+          downloadStatus: 'pending' as const,
+          downloadProgress: 0,
         }));
         setPicList(pics);
-        setCurrentStep(1);
+        return true;
       } else {
         message.error(response.error || '查询图片失败');
+        return false;
       }
     } catch (error) {
       console.error('查询图片失败:', error);
       message.error('查询图片失败');
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  // 步骤2：下载图片（已废弃，现在自动下载）
-  const handleDownload = async () => {
-    // 这个方法已不再使用，下载现在是自动的
-    console.log('下载现在是自动的，无需手动触发');
-  };
+  // 第一步：账户选择和参数设置
+  const handleStep1Next = async (values: any) => {
+    const account = accounts.find(acc => acc.id === values.accountId);
+    setSelectedAccount(account || null);
 
-  // 步骤3：标记图片
-  const handlePicToggle = (pid: number) => {
-    setPicList(prev => prev.map(pic => 
-      pic.pid === pid ? { ...pic, isUnfit: !pic.isUnfit } : pic
-    ));
-  };
+    const selectedTags = values.tags?.map((index: number) => account?.illust_tag[index]).flat() || [];
+    const searchParams = {
+      wx_name: account?.wx_id || '',
+      tags: selectedTags,
+      unsupport_tags: [],
+      limit: values.picCount || 12,
+      popularity: values.popularity || 0.15,
+    };
 
-  // 实时更新图片下载状态
-  useEffect(() => {
-    if (currentStep === 2 && picList.length > 0) {
-      const updateImageStatus = async () => {
-        try {
-          const pids = picList.map(pic => pic.pid);
-          const response = await weixinPublishAPI.checkDownloadStatus(pids);
-          
-          if (response.success && response.data) {
-            setPicList(prev => prev.map(pic => {
-              const status = response.data.find((item: any) => item.pid === pic.pid);
-              return {
-                ...pic,
-                image_path: status?.image_path || pic.image_path,
-                url: status?.image_path || pic.url,
-              };
-            }));
-          }
-        } catch (error) {
-          console.error('更新图片状态失败:', error);
-        }
-      };
+    // 保存搜索参数用于换一批
+    setLastSearchParams(searchParams);
 
-      // 每秒更新一次状态
-      const interval = setInterval(updateImageStatus, 1000);
-      
-      // 立即执行一次
-      updateImageStatus();
-
-      return () => clearInterval(interval);
-    }
-  }, [currentStep, picList.length]);
-
-  // 步骤4：发布
-  const handlePublish = async () => {
-    try {
-      setLoading(true);
-      
-      if (!selectedAccount) {
-        message.error('未选择账户');
-        setLoading(false);
-        return;
-      }
-      
-      const fitPids = picList.filter(pic => !pic.isUnfit).map(pic => pic.pid);
-      const unfitPids = picList.filter(pic => pic.isUnfit).map(pic => pic.pid);
-      
-      // 调用后端API开始发布
-      const response = await weixinPublishAPI.publishToWeixin({
-        account_id: selectedAccount.id,
-        pids: fitPids,
-        unfit_pids: unfitPids,
-      });
-      
-      if (response.success && response.data?.task_id) {
-        const taskId = response.data.task_id;
-        
-        // 轮询发布进度
-        const progressInterval = setInterval(async () => {
-          try {
-            const progressResponse = await weixinPublishAPI.getPublishProgress(taskId);
-            
-            if (progressResponse.success && progressResponse.data) {
-              const { progress, status } = progressResponse.data;
-              setPublishProgress(progress);
-              
-              if (status === 'completed') {
-                clearInterval(progressInterval);
-                message.success('发布完成');
-                setCurrentStep(4);
-                setLoading(false);
-              } else if (status === 'failed') {
-                clearInterval(progressInterval);
-                message.error('发布失败');
-                setLoading(false);
-              }
-            }
-          } catch (error) {
-            console.error('获取发布进度失败:', error);
-          }
-        }, 1000);
-      } else {
-        message.error(response.error || '开始发布失败');
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('发布失败:', error);
-      message.error('发布失败');
-      setLoading(false);
+    const success = await queryPictures(searchParams);
+    if (success) {
+      setCurrentStep(1); // 进入下载选择界面
     }
   };
 
+  // 处理本地下载（直接跳转到图片选择界面）
+  const handleLocalDownload = () => {
+    setCurrentStep(2); // 直接跳转到图片选择界面
+  };
+
+  // 处理云端下载完成
+  const handleCloudDownloadComplete = () => {
+    setCurrentStep(2); // 进入图片选择界面
+  };
+
+  // 处理图片选择完成
+  const handleImageSelectionComplete = (selectedPics: PicItem[]) => {
+    // 更新图片列表，只保留选中的图片
+    setPicList(selectedPics);
+    setCurrentStep(3); // 进入发布界面
+  };
+
+  // 处理发布完成
+  const handlePublishComplete = () => {
+    setCurrentStep(4); // 进入完成界面
+  };
+
+  // 换一批图片
+  const handleRefreshPics = async () => {
+    if (lastSearchParams) {
+      const success = await queryPictures(lastSearchParams);
+      if (success) {
+        message.success('已为您换了一批新图片');
+      }
+    }
+  };
+
+  // 返回上一步
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // 步骤定义
   const steps = [
     {
-      title: '选择账户和标签',
+      title: '账户选择',
       icon: <WechatOutlined />,
+      description: '选择微信公众号和设置参数',
     },
     {
-      title: '下载图片',
+      title: '下载方式',
       icon: <DownloadOutlined />,
+      description: '选择本地下载或云端下载',
     },
     {
-      title: '标记图片',
+      title: '图片选择',
       icon: <CheckCircleOutlined />,
+      description: '标记不合格图片并选择',
     },
     {
-      title: '发布到公众号',
+      title: '发布',
       icon: <UploadOutlined />,
+      description: '发布到微信公众号',
     },
     {
-      title: '发布完成',
+      title: '完成',
       icon: <CheckCircleFilled />,
+      description: '发布完成',
     },
   ];
 
+  // 渲染步骤内容
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
@@ -236,30 +197,32 @@ const WeixinPublish: React.FC = () => {
         return (
           <Step2Download
             picList={picList}
-            onNext={() => setCurrentStep(2)}
+            onNext={handleCloudDownloadComplete}
+            onLocalDownload={handleLocalDownload}
+            onBack={handleBack}
           />
         );
       case 2:
         return (
           <Step3ImageSelection
             picList={picList}
-            onPicToggle={handlePicToggle}
-            onNext={() => setCurrentStep(3)}
+            onNext={handleImageSelectionComplete}
+            onBack={handleBack}
+            onRefresh={handleRefreshPics}
           />
         );
       case 3:
         return (
           <Step4Publish
-            fitCount={picList.filter(pic => !pic.isUnfit).length}
-            publishProgress={publishProgress}
-            loading={loading}
-            onPublish={handlePublish}
+            selectedPics={picList}
+            onComplete={handlePublishComplete}
+            onBack={handleBack}
           />
         );
       case 4:
         return (
           <Step5Complete
-            fitCount={picList.filter(pic => !pic.isUnfit).length}
+            onBack={() => setCurrentStep(0)}
           />
         );
       default:
@@ -271,15 +234,15 @@ const WeixinPublish: React.FC = () => {
     <div style={{ padding: '24px' }}>
       <Title level={2}>微信公众号发布</Title>
       
-      <Steps current={currentStep} style={{ marginBottom: 24 }}>
-        {steps.map((step, index) => (
-          <Steps.Step key={index} title={step.title} icon={step.icon} />
-        ))}
-      </Steps>
-      
-      <Spin spinning={loading}>
+      <Steps
+        current={currentStep}
+        items={steps}
+        style={{ marginBottom: '32px' }}
+      />
+
+      <div style={{ minHeight: '400px' }}>
         {renderStepContent()}
-      </Spin>
+      </div>
     </div>
   );
 };

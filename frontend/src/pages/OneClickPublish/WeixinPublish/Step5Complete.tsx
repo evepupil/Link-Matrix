@@ -1,14 +1,14 @@
 import React from 'react';
-import { Card, Typography } from 'antd';
-import { CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Typography, Button, Space } from 'antd';
+import { CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
 interface Step5Props {
-  fitCount: number;
+  onBack: () => void;
 }
 
-const Step5Complete: React.FC<Step5Props> = ({ fitCount }) => {
+const Step5Complete: React.FC<Step5Props> = ({ onBack }) => {
   return (
     <Card>
       <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -17,8 +17,16 @@ const Step5Complete: React.FC<Step5Props> = ({ fitCount }) => {
           发布成功！
         </Title>
         <Text>
-          已成功发布 {fitCount} 张图片到微信公众号
+          已成功发布图片到微信公众号，请在公众号后台草稿箱查看
         </Text>
+        
+        <div style={{ marginTop: '24px' }}>
+          <Space>
+            <Button icon={<ArrowLeftOutlined />} onClick={onBack}>
+              重新开始
+            </Button>
+          </Space>
+        </div>
       </div>
     </Card>
   );

@@ -379,4 +379,140 @@ export class WeixinService {
       throw error;
     }
   }
+
+  /**
+   * 本地下载图片到tmp目录
+   * 支持清晰度降级，确保文件大小不超过9MB
+   */
+  static async downloadLocal(pid: number) {
+    try {
+      console.log(`📥 开始本地下载图片 PID: ${pid}`);
+      
+      // 确保tmp目录存在
+      const tmpDir = path.join(process.cwd(), 'tmp');
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      
+      // 检查是否已经下载过
+      const localPath = path.join(tmpDir, `pid_${pid}.jpg`);
+      if (fs.existsSync(localPath)) {
+        console.log(`✅ 图片 ${pid} 已存在于本地: ${localPath}`);
+        return {
+          success: true,
+          pid,
+          localPath: localPath,
+          message: '图片已存在于本地'
+        };
+      }
+      
+      // 获取图片信息
+      const imageInfo = await this.getImageInfo(pid);
+      if (!imageInfo) {
+        throw new Error('无法获取图片信息');
+      }
+      
+      // 尝试不同清晰度下载，确保文件大小不超过9MB
+      const sizes = ['original','regular','small','thumb_mini'];
+      let downloadedSize = 0;
+      let selectedSize = '';
+      let imageBuffer: Buffer | null = null;
+      
+      for (const size of sizes) {
+        try {
+          console.log(`🔄 尝试下载 ${size} 尺寸的图片...`);
+          
+          const imageUrl = imageInfo.urls[size as keyof typeof imageInfo.urls];
+          if (!imageUrl) {
+            console.log(`⚠️ 尺寸 ${size} 不可用，跳过`);
+            continue;
+          }
+          
+          // 下载图片
+          const response = await fetch(imageUrl, {
+            headers: {
+              'Referer': 'https://www.pixiv.net/',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          imageBuffer = Buffer.from(await response.arrayBuffer());
+          downloadedSize = imageBuffer.length;
+          
+          console.log(`📊 尺寸 ${size} 下载成功，文件大小: ${(downloadedSize / 1024 / 1024).toFixed(2)}MB`);
+          
+          // 检查文件大小是否超过9MB
+          if (downloadedSize <= 9.5 * 1024 * 1024) {
+            selectedSize = size;
+            console.log(`✅ 尺寸 ${size} 符合要求，文件大小: ${(downloadedSize / 1024 / 1024).toFixed(2)}MB`);
+            break;
+          } else {
+            console.log(`⚠️ 尺寸 ${size} 过大 (${(downloadedSize / 1024 / 1024).toFixed(2)}MB)，尝试下一个尺寸`);
+            imageBuffer = null;
+          }
+        } catch (error) {
+          console.error(`❌ 下载尺寸 ${size} 失败:`, error);
+          continue;
+        }
+      }
+      
+      if (!imageBuffer || !selectedSize) {
+        throw new Error('所有尺寸都无法下载或文件过大');
+      }
+      
+      // 保存到本地
+      fs.writeFileSync(localPath, imageBuffer);
+      
+      console.log(`💾 图片 ${pid} 已保存到本地: ${localPath}`);
+      console.log(`📊 最终尺寸: ${selectedSize}，文件大小: ${(downloadedSize / 1024 / 1024).toFixed(2)}MB`);
+      
+      return {
+        success: true,
+        pid,
+        localPath: localPath,
+        size: selectedSize,
+        fileSize: downloadedSize,
+        message: '本地下载成功'
+      };
+      
+    } catch (error) {
+      console.error(`❌ 本地下载图片 ${pid} 失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取图片信息（从Pixiv API）
+   */
+  private static async getImageInfo(pid: number) {
+    try {
+      // 这里需要实现从Pixiv API获取图片信息的逻辑
+      // 由于需要Pixiv的认证信息，这里提供一个简化的实现
+      // 实际项目中应该集成完整的Pixiv API调用
+      
+      console.log(`🔍 获取图片 ${pid} 信息...`);
+      
+      // 模拟获取图片信息
+      // 实际实现中应该调用Pixiv API
+      const mockUrls = {
+        thumb_mini: `https://pixiv.chaosyn.com/api?action=proxy-image&pid=${pid}&size=thumb_mini`,
+        small: `https://pixiv.chaosyn.com/api?action=proxy-image&pid=${pid}&size=small`,
+        regular: `https://pixiv.chaosyn.com/api?action=proxy-image&pid=${pid}&size=regular`,
+        original: `https://pixiv.chaosyn.com/api?action=proxy-image&pid=${pid}&size=original`
+      };
+      
+      return {
+        pid,
+        urls: mockUrls
+      };
+      
+    } catch (error) {
+      console.error(`❌ 获取图片 ${pid} 信息失败:`, error);
+      return null;
+    }
+  }
 } 
