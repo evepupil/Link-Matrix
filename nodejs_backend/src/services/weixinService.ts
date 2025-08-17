@@ -412,18 +412,42 @@ export class WeixinService {
         }
       }
 
-      // 2. 更新发布图片的wx_name
+      // 2. 更新发布图片的wx_name（追加模式）
       if (publishedPids.length > 0) {
         const publishedPidsNum = publishedPids.map(pid => parseInt(pid));
-        const { error: wxNameError } = await supabase
+        
+        // 先查询当前图片的wx_name值
+        const { data: currentPics, error: queryError } = await supabase
           .from('pic')
-          .update({ wx_name: wxName })
+          .select('pid, wx_name')
           .in('pid', publishedPidsNum);
 
-        if (wxNameError) {
-          console.error('❌ 更新图片wx_name失败:', wxNameError);
+        if (queryError) {
+          console.error('❌ 查询图片wx_name失败:', queryError);
         } else {
-          console.log(`✅ 更新 ${publishedPids.length} 张图片的wx_name为: ${wxName}`);
+          // 为每张图片构建新的wx_name（追加模式）
+          const updatePromises = currentPics.map(async (pic) => {
+            const currentWxName = pic.wx_name || '';
+            const newWxName = currentWxName 
+              ? `${currentWxName},${wxName}`  // 如果已有值，用逗号分隔追加
+              : wxName;                       // 如果为空，直接设置
+
+            const { error: updateError } = await supabase
+              .from('pic')
+              .update({ wx_name: newWxName })
+              .eq('pid', pic.pid);
+
+            if (updateError) {
+              console.error(`❌ 更新图片 ${pic.pid} 的wx_name失败:`, updateError);
+              return false;
+            }
+            return true;
+          });
+
+          const results = await Promise.all(updatePromises);
+          const successCount = results.filter(Boolean).length;
+          
+          console.log(`✅ 成功更新 ${successCount}/${publishedPids.length} 张图片的wx_name，追加: ${wxName}`);
         }
       }
 
